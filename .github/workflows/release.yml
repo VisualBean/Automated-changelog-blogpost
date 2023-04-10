@@ -1,0 +1,51 @@
+name: Release
+on:
+  workflow_dispatch:
+
+jobs:
+  prereleaseCheck:
+    runs-on: ubuntu-latest
+    name: Check release
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v1
+    
+    - name: Semantic Release
+      uses: cycjimmy/semantic-release-action@v3
+      id: semantic
+      with:
+        extra_plugins: |
+          conventional-changelog-conventionalcommits
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # Needed if verified commits are necesary (this uses a github app)
+    - name: Get token
+      if: steps.semantic.outputs.new_release_published == 'true'
+      id: get_token
+      uses: peter-murray/workflow-application-token-action@v2.1.0
+      with:
+        application_id: ${{ secrets.APPLICATION_ID }}
+        application_private_key: ${{ secrets.APPLICATION_PRIVATE_KEY }}
+
+    - name: Commit changes
+      if: steps.semantic.outputs.new_release_published == 'true'
+      env:
+        # If verified commits are not needed, simply use ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ steps.get_token.outputs.token }}
+        FILE_TO_COMMIT: CHANGELOG.md
+        DESTINATION_BRANCH: ${{ github.ref }}
+      run: |
+        export MESSAGE="chore: update $FILE_TO_COMMIT"
+        export SHA=$( git rev-parse $DESTINATION_BRANCH:$FILE_TO_COMMIT )
+        export CONTENT=$( base64 -i $FILE_TO_COMMIT )
+        gh api --method PUT /repos/:owner/:repo/contents/$FILE_TO_COMMIT \
+          --field message="$MESSAGE" \
+          --field content="$CONTENT" \
+          --field encoding="base64" \
+          --field branch="$DESTINATION_BRANCH" \
+          --field sha="$SHA"
+
+    outputs:
+      trigger_release: ${{ steps.semantic.outputs.new_release_published }}
+      version: ${{ steps.semantic.outputs.new_release_published == 'true' && steps.semantic.outputs.new_release_version }}
