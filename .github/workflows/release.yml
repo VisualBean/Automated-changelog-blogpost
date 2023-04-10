@@ -18,21 +18,10 @@ jobs:
           conventional-changelog-conventionalcommits
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    # Needed if verified commits are necesary (this uses a github app)
-    - name: Get token
-      if: steps.semantic.outputs.new_release_published == 'true'
-      id: get_token
-      uses: peter-murray/workflow-application-token-action@v2.1.0
-      with:
-        application_id: ${{ secrets.APPLICATION_ID }}
-        application_private_key: ${{ secrets.APPLICATION_PRIVATE_KEY }}
-
     - name: Commit changes
       if: steps.semantic.outputs.new_release_published == 'true'
       env:
-        # If verified commits are not needed, simply use ${{ secrets.GITHUB_TOKEN }}
-        GITHUB_TOKEN: ${{ steps.get_token.outputs.token }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         FILE_TO_COMMIT: CHANGELOG.md
         DESTINATION_BRANCH: ${{ github.ref }}
       run: |
